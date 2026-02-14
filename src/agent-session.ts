@@ -210,14 +210,6 @@ async function runTurn(
   if (result.toolCalls && result.toolCalls.length > 0) {
     logger.trace(`Tool calls: ${result.toolCalls.length}`);
 
-    // Add assistant message with tool calls to history
-    state.messages.push({
-      role: "assistant",
-      content: result.text || "",
-    });
-
-    const toolResultTexts: string[] = [];
-
     for (const toolCall of result.toolCalls) {
       const tc = toolCall as any;
 
@@ -237,10 +229,6 @@ async function runTurn(
         if (sessionConfig.callbacks?.onError) {
           await sessionConfig.callbacks.onError(sessionId, errorInfo);
         }
-
-        toolResultTexts.push(
-          `Tool ${tc.toolName} failed: ${error.message}. Please fix the arguments and try again.`,
-        );
         continue;
       }
 
@@ -277,7 +265,10 @@ async function runTurn(
           state.completionReason = "task_complete";
           state.taskResult = resultData.result;
 
-          // Add completion message to history
+          // Add SDK's response messages (includes tool calls and results)
+          state.messages.push(...result.response.messages);
+
+          // Add completion message
           state.messages.push({
             role: "user",
             content: `Task marked as complete. Session ending.`,
@@ -298,26 +289,16 @@ async function runTurn(
         if (sessionConfig.callbacks?.onToolResult) {
           await sessionConfig.callbacks.onToolResult(sessionId, toolResultInfo);
         }
-
-        toolResultTexts.push(
-          `Tool ${tr.toolName} returned: ${JSON.stringify(resultData)}`,
-        );
       }
     }
 
-    // Add tool results as user message
-    if (toolResultTexts.length > 0) {
-      state.messages.push({
-        role: "user",
-        content: toolResultTexts.join("\n\n"),
-      });
-    }
+    // Add SDK's response messages (includes assistant message with tool calls and tool result messages)
+    // This is the proper format that includes tool call IDs and can be fed back to the LLM
+    state.messages.push(...result.response.messages);
   } else {
     // No tool calls - agent produced final response without completing task
-    state.messages.push({
-      role: "assistant",
-      content: result.text || "",
-    });
+    // Add SDK's response message (assistant message with text)
+    state.messages.push(...result.response.messages);
 
     // Don't end the session - agent might be thinking or waiting
     // The idle check will nudge them if needed
