@@ -1,0 +1,42 @@
+{
+  "name": "@waterfell/agentic-loop",
+  "version": "0.2.0",
+  "description": "A lightweight library for running agentic loops with LLMs and tool calling",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "test": "node --loader ts-node/esm examples/basic.ts"
+  },
+  "keywords": [
+    "agent",
+    "llm",
+    "ai",
+    "tool-calling",
+    "mcp",
+    "anthropic",
+    "openai",
+    "ollama"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.36",
+    "@ai-sdk/openai": "^3.0.25",
+    "ai": "^6.0.0",
+    "ai-sdk-ollama": "^3.0.0",
+    "dotenv": "^17.2.3",
+    "zod": "^4.3.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "typescript": "^5.7.2"
+  }
+}
