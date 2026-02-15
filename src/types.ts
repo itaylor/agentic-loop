@@ -80,13 +80,23 @@ export interface ErrorInfo {
 }
 
 /**
+ * Information about a session suspension
+ */
+export interface SessionSuspendInfo {
+  reason: string;
+  data?: any; // Arbitrary data about why/what we're waiting for
+  turn: number;
+}
+
+/**
  * Session completion info
  */
 export interface SessionCompleteInfo {
   finalOutput: string;
   totalTurns: number;
-  completionReason: "task_complete" | "max_turns" | "error";
+  completionReason: "task_complete" | "max_turns" | "error" | "suspended";
   taskResult?: any;
+  suspendInfo?: SessionSuspendInfo;
 }
 
 /**
@@ -156,6 +166,17 @@ export interface SessionCallbacks {
     sessionId: string,
     summarizedMessages: Message[],
   ) => Message[] | Promise<Message[]>;
+
+  /**
+   * Called when the session is suspended (agent is blocked waiting for something)
+   * The session has stopped and its state is in the result.
+   * To resume, call runAgentSession again with initialMessages from the result,
+   * optionally adding a message with the information the agent was waiting for.
+   */
+  onSuspend?: (
+    sessionId: string,
+    info: SessionSuspendInfo,
+  ) => void | Promise<void>;
 }
 
 /**
@@ -234,13 +255,16 @@ export interface AgentSessionResult {
   totalTurns: number;
 
   /** How the session completed */
-  completionReason: "task_complete" | "max_turns" | "error";
+  completionReason: "task_complete" | "max_turns" | "error" | "suspended";
 
   /** Full message history */
   messages: Message[];
 
   /** Result from task_complete tool if called */
   taskResult?: any;
+
+  /** Suspension info if session was suspended */
+  suspendInfo?: SessionSuspendInfo;
 
   /** Error if session ended due to error */
   error?: Error;
@@ -255,7 +279,8 @@ export interface SessionState {
   finalOutput: string;
   shouldContinue: boolean;
   taskResult?: any;
-  completionReason: "task_complete" | "max_turns" | "error";
+  suspendInfo?: SessionSuspendInfo;
+  completionReason: "task_complete" | "max_turns" | "error" | "suspended";
 }
 
 /**

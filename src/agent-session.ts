@@ -20,6 +20,7 @@ import {
   ToolResultInfo,
   ErrorInfo,
   SessionCompleteInfo,
+  SessionSuspendInfo,
 } from "./types.js";
 
 /**
@@ -291,6 +292,37 @@ async function runTurn(
           return;
         }
 
+        // Check for suspension
+        if (
+          resultData &&
+          typeof resultData === "object" &&
+          resultData.__suspend__
+        ) {
+          logger.info(`Session suspended: ${resultData.reason}`);
+          state.shouldContinue = false;
+          state.completionReason = "suspended";
+
+          // Store suspension info
+          state.suspendInfo = {
+            reason: resultData.reason,
+            data: resultData.data,
+            turn: state.turnCount,
+          };
+
+          // Add SDK's response messages (includes tool calls and results)
+          state.messages.push(...result.response.messages);
+
+          // Notify suspension callback
+          if (sessionConfig.callbacks?.onSuspend) {
+            await sessionConfig.callbacks.onSuspend(
+              sessionId,
+              state.suspendInfo,
+            );
+          }
+
+          return;
+        }
+
         // Notify tool result
         const toolResultInfo: ToolResultInfo = {
           toolName: tr.toolName,
@@ -510,15 +542,12 @@ export function runAgentSession(
         totalTurns: state.turnCount,
         completionReason: state.completionReason,
         taskResult: state.taskResult,
+        suspendInfo: state.suspendInfo,
       };
 
       if (sessionConfig.callbacks?.onComplete) {
         await sessionConfig.callbacks.onComplete(sessionId, completeInfo);
       }
-
-      logger.info(
-        `Session completed after ${state.turnCount} turns (${state.completionReason})`,
-      );
 
       return {
         sessionId,
@@ -527,6 +556,7 @@ export function runAgentSession(
         completionReason: state.completionReason,
         messages: state.messages,
         taskResult: state.taskResult,
+        suspendInfo: state.suspendInfo,
       };
     } catch (error: any) {
       logger.error(`Session error: ${error.message}`);
@@ -550,6 +580,7 @@ export function runAgentSession(
         totalTurns: state.turnCount,
         completionReason: "error",
         taskResult: state.taskResult,
+        suspendInfo: state.suspendInfo,
       };
 
       if (sessionConfig.callbacks?.onComplete) {
@@ -563,6 +594,7 @@ export function runAgentSession(
         completionReason: "error",
         messages: state.messages,
         taskResult: state.taskResult,
+        suspendInfo: state.suspendInfo,
         error,
       };
     }

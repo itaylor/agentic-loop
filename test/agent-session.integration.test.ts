@@ -12,6 +12,7 @@ import type {
   ToolCallInfo,
   ToolResultInfo,
   SessionCompleteInfo,
+  SessionSuspendInfo,
 } from "../src/types.js";
 import { z } from "zod";
 
@@ -633,6 +634,243 @@ describe("Agent Session Integration Tests", () => {
       assert.ok(messageSnapshots.length > 0);
       // Message count should generally increase (though summarization could reduce it)
       assert.ok(messageSnapshots[messageSnapshots.length - 1] > 0);
+    });
+  });
+
+  describe("Session Suspension", () => {
+    it("should suspend session when tool returns __suspend__ signal", async () => {
+      let suspendCalled = false;
+      let suspendInfo: any = null;
+
+      const result = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt: "You are a helpful assistant.",
+        initialMessage:
+          "Please call the wait_for_approval tool to get approval.",
+        tools: {
+          wait_for_approval: {
+            description: "Wait for external approval before proceeding",
+            inputSchema: z.object({
+              reason: z.string().describe("Reason for waiting"),
+            }),
+            execute: async (args: { reason: string }) => {
+              // Return suspension signal
+              return {
+                __suspend__: true,
+                reason: "waiting_for_approval",
+                data: {
+                  requestReason: args.reason,
+                  timestamp: new Date().toISOString(),
+                },
+              };
+            },
+          },
+        },
+        maxTurns: FAST_MAX_TURNS,
+        callbacks: {
+          onSuspend: async (sessionId, info) => {
+            suspendCalled = true;
+            suspendInfo = info;
+          },
+        },
+      });
+
+      assert.strictEqual(result.completionReason, "suspended");
+      assert.ok(suspendCalled, "onSuspend callback should be called");
+      assert.ok(suspendInfo, "Suspend info should be provided");
+      assert.strictEqual(suspendInfo.reason, "waiting_for_approval");
+      assert.ok(suspendInfo.data, "Suspend data should be present");
+      assert.ok(result.suspendInfo, "Result should include suspendInfo");
+      assert.strictEqual(result.suspendInfo.reason, "waiting_for_approval");
+      assert.ok(result.messages.length > 0, "Should have message history");
+    });
+
+    it("should resume suspended session with additional message", async () => {
+      // First session - suspend
+      const initialResult = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt: "You are a helpful assistant that needs approval.",
+        initialMessage:
+          "Call wait_for_approval to ask for permission to proceed.",
+        tools: {
+          wait_for_approval: {
+            description: "Wait for external approval",
+            inputSchema: z.object({
+              question: z.string(),
+            }),
+            execute: async (args: { question: string }) => {
+              return {
+                __suspend__: true,
+                reason: "waiting_for_approval",
+                data: { question: args.question },
+              };
+            },
+          },
+        },
+        maxTurns: FAST_MAX_TURNS,
+      });
+
+      assert.strictEqual(initialResult.completionReason, "suspended");
+      assert.ok(initialResult.suspendInfo);
+
+      // Resume with approval message
+      const resumedResult = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt: "You are a helpful assistant that needs approval.",
+        initialMessages: [
+          ...initialResult.messages,
+          {
+            role: "user",
+            content:
+              "Approval granted! You can proceed. Now call task_complete.",
+          },
+        ],
+        tools: {},
+        maxTurns: FAST_MAX_TURNS,
+      });
+
+      // Should complete successfully after resuming
+      assert.strictEqual(resumedResult.completionReason, "task_complete");
+      assert.ok(resumedResult.messages.length > initialResult.messages.length);
+      assert.ok(resumedResult.totalTurns > 0);
+    });
+
+    it("should maintain conversation context across suspension and resumption", async () => {
+      let suspendCount = 0;
+
+      // First session - introduce context and suspend
+      const result1 = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt:
+          "You are a helpful assistant. Remember information you're told.",
+        initialMessage:
+          "My favorite color is blue. Now call the ask_question tool to ask me something.",
+        tools: {
+          ask_question: {
+            description: "Ask the user a question and wait for their answer",
+            inputSchema: z.object({
+              question: z.string(),
+            }),
+            execute: async (args: { question: string }) => {
+              suspendCount++;
+              return {
+                __suspend__: true,
+                reason: "waiting_for_answer",
+                data: { question: args.question },
+              };
+            },
+          },
+        },
+        maxTurns: FAST_MAX_TURNS,
+      });
+
+      assert.strictEqual(result1.completionReason, "suspended");
+      assert.strictEqual(suspendCount, 1);
+      const question = result1.suspendInfo?.data?.question || "";
+      assert.ok(question.length > 0, "Should have asked a question");
+
+      // Resume with answer
+      const result2 = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt:
+          "You are a helpful assistant. Remember information you're told.",
+        initialMessages: [
+          ...result1.messages,
+          {
+            role: "user",
+            content:
+              "My answer is: pizza. Now remind me what my favorite color is and then call task_complete.",
+          },
+        ],
+        tools: {},
+        maxTurns: FAST_MAX_TURNS,
+      });
+
+      assert.strictEqual(result2.completionReason, "task_complete");
+      // Check that the agent remembered the color (should mention "blue" in output)
+      const fullConversation = result2.messages
+        .map((m) => (typeof m.content === "string" ? m.content : ""))
+        .join(" ")
+        .toLowerCase();
+      assert.ok(
+        fullConversation.includes("blue"),
+        "Agent should remember the favorite color from before suspension",
+      );
+    });
+
+    it("should handle multiple suspensions in sequence", async () => {
+      const suspensions: string[] = [];
+
+      // First suspension
+      const result1 = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt: "You are a helpful assistant.",
+        initialMessage: "Call the wait tool with reason 'step1'.",
+        tools: {
+          wait: {
+            description: "Wait for external input",
+            inputSchema: z.object({
+              reason: z.string(),
+            }),
+            execute: async (args: { reason: string }) => {
+              suspensions.push(args.reason);
+              return {
+                __suspend__: true,
+                reason: "waiting",
+                data: { step: args.reason },
+              };
+            },
+          },
+        },
+        maxTurns: FAST_MAX_TURNS,
+      });
+
+      assert.strictEqual(result1.completionReason, "suspended");
+      assert.deepStrictEqual(suspensions, ["step1"]);
+
+      // Resume and suspend again
+      const result2 = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt: "You are a helpful assistant.",
+        initialMessages: [
+          ...result1.messages,
+          {
+            role: "user",
+            content: "Step 1 complete. Now call wait with reason 'step2'.",
+          },
+        ],
+        tools: {
+          wait: {
+            description: "Wait for external input",
+            inputSchema: z.object({
+              reason: z.string(),
+            }),
+            execute: async (args: { reason: string }) => {
+              suspensions.push(args.reason);
+              return {
+                __suspend__: true,
+                reason: "waiting",
+                data: { step: args.reason },
+              };
+            },
+          },
+        },
+        maxTurns: FAST_MAX_TURNS,
+      });
+
+      assert.strictEqual(result2.completionReason, "suspended");
+      assert.deepStrictEqual(suspensions, ["step1", "step2"]);
+
+      // Final resume and complete
+      const result3 = await runAgentSession(TEST_MODEL_CONFIG, {
+        systemPrompt: "You are a helpful assistant.",
+        initialMessages: [
+          ...result2.messages,
+          {
+            role: "user",
+            content:
+              "Step 2 complete. Now call task_complete with summary of all steps.",
+          },
+        ],
+        tools: {},
+        maxTurns: FAST_MAX_TURNS,
+      });
+
+      assert.strictEqual(result3.completionReason, "task_complete");
+      assert.strictEqual(suspensions.length, 2);
     });
   });
 });

@@ -43,6 +43,7 @@ const result = await session.promise;
 - **Multi-turn conversations** with automatic tool calling
 - **Multiple LLM providers** (OpenAI, Anthropic, Ollama)
 - **Built-in task completion** - agents call `task_complete` when done
+- **Session suspension** - pause sessions to wait for external events (approval, async ops, etc.)
 - **Session resumption** - continue from saved messages after crashes
 - **Token management** - automatic summarization when approaching limits
 - **Error handling** - automatic retries with errors added to conversation
@@ -101,9 +102,10 @@ The session object is "thenable" - you can await it directly.
   sessionId: string;
   finalOutput: string;
   totalTurns: number;
-  completionReason: "task_complete" | "max_turns" | "error";
+  completionReason: "task_complete" | "max_turns" | "error" | "suspended";
   messages: Message[];
   taskResult?: any;    // Data from task_complete tool
+  suspendInfo?: SessionSuspendInfo;  // Present if suspended
   error?: Error;
 }
 ```
@@ -125,6 +127,9 @@ All callbacks receive `sessionId` as first parameter:
   // Summarization callbacks (library handles the LLM call)
   onBeforeSummarize?: (sessionId: string, messages: Message[]) => Message[] | Promise<Message[]>;
   onAfterSummarize?: (sessionId: string, summarizedMessages: Message[]) => Message[] | Promise<Message[]>;
+  
+  // Suspension callback
+  onSuspend?: (sessionId: string, info: SessionSuspendInfo) => void | Promise<void>;
 }
 ```
 
@@ -305,6 +310,144 @@ task_complete({
 ```
 
 Signals graceful completion with `completionReason: "task_complete"`.
+
+## Session Suspension
+
+Agents can suspend their session to wait for external events (human approval, async operations, etc.). The session stops cleanly and can be resumed later, even after server restarts.
+
+### Creating a Suspendable Tool
+
+Any tool can suspend a session by returning a special `__suspend__` signal:
+
+```typescript
+const result = await runAgentSession(modelConfig, {
+  systemPrompt: "You are a helpful assistant that needs approval.",
+  initialMessage: "Please request approval to proceed.",
+  tools: {
+    request_approval: {
+      description: "Request approval from a human. Your session will pause until they respond.",
+      inputSchema: z.object({
+        action: z.string().describe("The action that needs approval"),
+        reason: z.string().describe("Why this action is needed"),
+      }),
+      execute: async (args) => {
+        // Store the approval request somewhere
+        await db.createApprovalRequest(args);
+        
+        // Return suspension signal
+        return {
+          __suspend__: true,
+          reason: "waiting_for_approval",
+          data: {
+            action: args.action,
+            requestId: generateId(),
+          },
+        };
+      },
+    },
+  },
+  callbacks: {
+    onSuspend: async (sessionId, info) => {
+      console.log(`Session ${sessionId} suspended: ${info.reason}`);
+      // Save suspension state to database
+      await db.saveSuspendedSession(sessionId, info);
+    },
+  },
+});
+
+// Session stopped with completionReason: "suspended"
+console.log(result.completionReason); // "suspended"
+console.log(result.suspendInfo); // { reason: "waiting_for_approval", data: {...}, turn: 1 }
+```
+
+### Resuming a Suspended Session
+
+To resume, simply call `runAgentSession` again with the saved messages plus the response:
+
+```typescript
+// Later, when approval arrives...
+const suspendedSession = await db.loadSuspendedSession(sessionId);
+
+const resumedResult = await runAgentSession(modelConfig, {
+  sessionId: sessionId,  // Same session ID
+  systemPrompt: "You are a helpful assistant that needs approval.",
+  initialMessages: [
+    ...suspendedSession.messages,  // All previous messages
+    {
+      role: "user",
+      content: "Approval granted! You may proceed. Call task_complete when done.",
+    },
+  ],
+  tools: {}, // Same tools or empty if no longer needed
+});
+
+// Agent continues from where it left off
+console.log(resumedResult.completionReason); // "task_complete"
+```
+
+### Persistence Across Restarts
+
+The suspension state is just data - it survives server restarts:
+
+```typescript
+// Before restart - save everything
+const result = await runAgentSession(modelConfig, config);
+if (result.completionReason === "suspended") {
+  await fs.writeFile(`sessions/${result.sessionId}.json`, JSON.stringify({
+    sessionId: result.sessionId,
+    messages: result.messages,
+    suspendInfo: result.suspendInfo,
+  }));
+}
+
+// --- SERVER RESTART ---
+
+// After restart - load and resume
+const saved = JSON.parse(await fs.readFile(`sessions/${sessionId}.json`));
+const resumedResult = await runAgentSession(modelConfig, {
+  sessionId: saved.sessionId,
+  initialMessages: [
+    ...saved.messages,
+    { role: "user", content: "External data has arrived: {...}" },
+  ],
+  // ... rest of config
+});
+```
+
+### Use Cases
+
+- **Human approval workflows** - Agent requests permission, waits for response
+- **Async API calls** - Wait for webhook callbacks or long-running operations
+- **Multi-agent coordination** - Agent asks another agent a question, blocks until answered
+- **Rate limiting** - Suspend when rate limited, resume when quota refreshes
+- **Scheduled operations** - Suspend until a specific time
+
+### Multiple Suspensions
+
+Sessions can suspend and resume multiple times:
+
+```typescript
+let result = await runAgentSession(modelConfig, config);
+
+// First suspension
+assert.equal(result.completionReason, "suspended");
+result = await runAgentSession(modelConfig, {
+  initialMessages: [...result.messages, { role: "user", content: "Step 1 done" }],
+  // ...
+});
+
+// Second suspension
+assert.equal(result.completionReason, "suspended");
+result = await runAgentSession(modelConfig, {
+  initialMessages: [...result.messages, { role: "user", content: "Step 2 done" }],
+  // ...
+});
+
+// Final completion
+assert.equal(result.completionReason, "task_complete");
+```
+
+See [examples/suspension.ts](./examples/suspension.ts) for complete working examples.
 
 ## Error Handling
 
