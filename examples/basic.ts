@@ -1,6 +1,6 @@
 // Basic example of using @waterfell/agentic-loop
 
-import { runAgentSession } from "../src/index.js";
+import { runAgentSession, type Message } from "../src/index.js";
 import { z } from "zod";
 
 // Define some simple tools
@@ -127,7 +127,7 @@ When done, call task_complete with a summary.`,
   console.log("\n=== Example 4: Token limit with summarization ===\n");
 
   // Save last 3 messages to append after summarization
-  let recentMessages: (typeof import("../src/types.js").Message)[] = [];
+  let recentMessages: Message[] = [];
 
   const summarizationSession = runAgentSession(
     {

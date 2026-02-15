@@ -5,6 +5,13 @@ export { runAgentSession } from "./agent-session.js";
 export type {
   ModelConfig,
   Message,
+  UserContent,
+  AssistantContent,
+  TextPart,
+  ImagePart,
+  FilePart,
+  ToolCallPart,
+  ToolResultPart,
   ToolCallInfo,
   ToolResultInfo,
   ErrorInfo,

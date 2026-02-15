@@ -128,6 +128,33 @@ All callbacks receive `sessionId` as first parameter:
 }
 ```
 
+### Messages
+
+The `Message` type reflects the actual AI SDK message structure. Messages can contain simple text or complex content with tool calls, results, images, and files:
+
+```typescript
+type Message = 
+  | {
+      role: "user";
+      content: string | Array<TextPart | ImagePart | FilePart>;
+    }
+  | {
+      role: "assistant";
+      content: string | Array<TextPart | FilePart | ToolCallPart | ToolResultPart>;
+    };
+```
+
+**Simple text messages:**
+```typescript
+{ role: "user", content: "Hello!" }
+{ role: "assistant", content: "Hi there!" }
+```
+
+**Complex messages with tool calls/results:**
+When the agent calls tools, the AI SDK automatically creates messages with structured content arrays containing `ToolCallPart` and `ToolResultPart` objects. These are handled internally by the library.
+
+**For most use cases**, you can treat message content as strings. The library handles the complex formats automatically when tools are used.
+
 ## Examples
 
 ### Basic Usage

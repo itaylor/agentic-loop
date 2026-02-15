@@ -1,6 +1,26 @@
 // Core types for the agentic loop library
 
 import type { Tool } from "ai";
+import type {
+  UserContent,
+  AssistantContent,
+  TextPart,
+  ImagePart,
+  FilePart,
+  ToolCallPart,
+  ToolResultPart,
+} from "@ai-sdk/provider-utils";
+
+// Re-export the AI SDK types for convenience
+export type {
+  UserContent,
+  AssistantContent,
+  TextPart,
+  ImagePart,
+  FilePart,
+  ToolCallPart,
+  ToolResultPart,
+};
 
 /**
  * Configuration for the LLM model provider
@@ -18,14 +38,19 @@ export interface ModelConfig {
 
 /**
  * A message in the conversation history
- * Note: This type is simplified for the public API. Internally, AI SDK messages
- * may have content as arrays/objects (tool calls/results), but we cast them to 'any'
- * when needed. The estimateTokenCount function handles both formats.
+ * Reflects the actual AI SDK message structure where content can be:
+ * - string: for simple text messages
+ * - array: for messages with tool calls/results, images, files, etc.
  */
-export interface Message {
-  role: "user" | "assistant";
-  content: string;
-}
+export type Message =
+  | {
+      role: "user";
+      content: UserContent;
+    }
+  | {
+      role: "assistant";
+      content: AssistantContent;
+    };
 
 /**
  * Information about a tool call

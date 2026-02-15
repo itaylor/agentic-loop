@@ -93,12 +93,12 @@ function createReminderMessage(): string {
  */
 function estimateTokenCount(messages: Message[]): number {
   const totalChars = messages.reduce((sum, msg) => {
-    const content = (msg as any).content;
-    // Handle both string content (text messages) and array/object content (tool calls/results)
+    const content = msg.content;
+    // Handle both string content (text messages) and array content (tool calls/results)
     if (typeof content === "string") {
       return sum + content.length;
     }
-    // AI SDK messages with tool calls have content as arrays/objects
+    // AI SDK messages with tool calls have content as arrays
     // Stringify to get actual character count
     return sum + JSON.stringify(content).length;
   }, 0);
@@ -114,7 +114,7 @@ async function summarizeMessages(
 ): Promise<string> {
   const conversationText = messages
     .map((m) => {
-      const content = (m as any).content;
+      const content = m.content;
       const contentStr =
         typeof content === "string" ? content : JSON.stringify(content);
       return `${m.role}: ${contentStr}`;
