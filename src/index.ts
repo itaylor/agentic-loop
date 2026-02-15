@@ -16,6 +16,7 @@ export type {
   ToolResultInfo,
   ErrorInfo,
   SessionCompleteInfo,
+  SessionSuspendInfo,
   Logger,
   SessionCallbacks,
   AgentSessionConfig,
