@@ -244,9 +244,15 @@ describe("Agent Session Integration Tests", () => {
         tools: {},
         maxTurns: FAST_MAX_TURNS,
         callbacks: {
-          onTurnStart: async (sessionId) => sessionIds.push(sessionId),
-          onAssistantMessage: async (sessionId) => sessionIds.push(sessionId),
-          onComplete: async (sessionId) => sessionIds.push(sessionId),
+          onTurnStart: async (sessionId) => {
+            sessionIds.push(sessionId);
+          },
+          onAssistantMessage: async (sessionId) => {
+            sessionIds.push(sessionId);
+          },
+          onComplete: async (sessionId) => {
+            sessionIds.push(sessionId);
+          },
         },
       });
 
