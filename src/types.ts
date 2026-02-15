@@ -18,6 +18,9 @@ export interface ModelConfig {
 
 /**
  * A message in the conversation history
+ * Note: This type is simplified for the public API. Internally, AI SDK messages
+ * may have content as arrays/objects (tool calls/results), but we cast them to 'any'
+ * when needed. The estimateTokenCount function handles both formats.
  */
 export interface Message {
   role: "user" | "assistant";

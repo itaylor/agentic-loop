@@ -92,7 +92,16 @@ function createReminderMessage(): string {
  * This is a simple heuristic: ~4 characters per token
  */
 function estimateTokenCount(messages: Message[]): number {
-  const totalChars = messages.reduce((sum, msg) => sum + msg.content.length, 0);
+  const totalChars = messages.reduce((sum, msg) => {
+    const content = (msg as any).content;
+    // Handle both string content (text messages) and array/object content (tool calls/results)
+    if (typeof content === "string") {
+      return sum + content.length;
+    }
+    // AI SDK messages with tool calls have content as arrays/objects
+    // Stringify to get actual character count
+    return sum + JSON.stringify(content).length;
+  }, 0);
   return Math.ceil(totalChars / 4);
 }
 
@@ -104,7 +113,12 @@ async function summarizeMessages(
   messages: Message[],
 ): Promise<string> {
   const conversationText = messages
-    .map((m) => `${m.role}: ${m.content}`)
+    .map((m) => {
+      const content = (m as any).content;
+      const contentStr =
+        typeof content === "string" ? content : JSON.stringify(content);
+      return `${m.role}: ${contentStr}`;
+    })
     .join("\n\n");
 
   const summaryPrompt = `Summarize the following conversation concisely, preserving all key decisions, facts, context, and important details. Focus on what was accomplished and what information is essential for continuing the conversation:\n\n${conversationText}`;

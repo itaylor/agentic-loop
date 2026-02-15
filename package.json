@@ -13,7 +13,9 @@
     "build": "tsc",
     "build:watch": "tsc --watch",
     "clean": "rm -rf dist",
-    "test": "node --loader ts-node/esm examples/basic.ts"
+    "test": "npm run test:integration",
+    "test:integration": "node --import tsx --test test/**/*.test.ts",
+    "test:watch": "node --import tsx --test --watch test/**/*.test.ts"
   },
   "keywords": [
     "agent",
@@ -37,6 +39,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.2"
   }
 }
