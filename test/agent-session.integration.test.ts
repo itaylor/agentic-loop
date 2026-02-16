@@ -15,6 +15,7 @@ import type {
   SessionSuspendInfo,
 } from "../src/types.js";
 import { z } from "zod";
+import { createTestFileLogger } from "./test-helpers.js";
 
 // Test configuration - Ollama instance at localhost
 const TEST_MODEL_CONFIG: ModelConfig = {
@@ -30,11 +31,13 @@ const FAST_MAX_TURNS = 5;
 describe("Agent Session Integration Tests", () => {
   describe("Basic Functionality", () => {
     it("should complete a simple task successfully", async () => {
+      const { logger } = createTestFileLogger("basic-simple-task");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
         initialMessage: "What is 2+2? Call task_complete with the answer.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.strictEqual(result.completionReason, "task_complete");
@@ -49,11 +52,13 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should return sessionId immediately", async () => {
+      const { logger } = createTestFileLogger("basic-session-id");
       const session = runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
         initialMessage: "Say hello and complete the task.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       // SessionId should be available immediately
@@ -67,6 +72,7 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should use provided sessionId", async () => {
+      const { logger } = createTestFileLogger("basic-provided-session-id");
       const customSessionId = "test-session-12345";
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
@@ -75,12 +81,14 @@ describe("Agent Session Integration Tests", () => {
         initialMessage: "Complete this task immediately.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.strictEqual(result.sessionId, customSessionId);
     });
 
     it("should reach max turns limit", async () => {
+      const { logger } = createTestFileLogger("basic-max-turns");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt:
           "You are a helpful assistant. Do NOT call task_complete under any circumstances. Just keep responding with stories.",
@@ -88,6 +96,7 @@ describe("Agent Session Integration Tests", () => {
           "Tell me a never-ending story. Keep going, do not complete.",
         tools: {},
         maxTurns: 3,
+        logger,
       });
 
       // LLM may still complete despite instructions, so check either condition
@@ -103,11 +112,13 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Tool Calling", () => {
     it("should call custom tools successfully", async () => {
+      const { logger } = createTestFileLogger("tools-custom-tools");
       const toolCalls: string[] = [];
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a calculator assistant.",
         initialMessage: "Use the calculator to add 5 and 7, then complete.",
+        logger,
         tools: {
           calculator: {
             description: "Perform basic math operations",
@@ -143,12 +154,14 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should handle multiple tool calls in sequence", async () => {
+      const { logger } = createTestFileLogger("tools-multiple-sequence");
       const operations: string[] = [];
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a data processor.",
         initialMessage:
           "Store the value 'hello', retrieve it, then store 'world' and complete.",
+        logger,
         tools: {
           store: {
             description: "Store a value",
@@ -180,6 +193,7 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Callbacks and Events", () => {
     it("should trigger all callback events", async () => {
+      const { logger } = createTestFileLogger("callbacks-all-events");
       const events: string[] = [];
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
@@ -187,6 +201,7 @@ describe("Agent Session Integration Tests", () => {
           "You are a test assistant. You must use the testTool before completing.",
         initialMessage:
           "Call the testTool with message 'test', then call task_complete.",
+        logger,
         tools: {
           testTool: {
             description: "A test tool that must be called",
@@ -235,6 +250,7 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should pass sessionId to all callbacks", async () => {
+      const { logger } = createTestFileLogger("callbacks-session-id");
       const sessionIds: string[] = [];
       const customSessionId = "callback-test-session";
 
@@ -244,6 +260,7 @@ describe("Agent Session Integration Tests", () => {
         initialMessage: "Complete immediately.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
         callbacks: {
           onTurnStart: async (sessionId) => {
             sessionIds.push(sessionId);
@@ -270,6 +287,7 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Session Resumption", () => {
     it("should resume from initialMessages", async () => {
+      const { logger } = createTestFileLogger("resume-from-initial-messages");
       const initialMessages: Message[] = [
         { role: "user", content: "Remember the number 42" },
         {
@@ -289,6 +307,7 @@ describe("Agent Session Integration Tests", () => {
         initialMessages,
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.strictEqual(result.completionReason, "task_complete");
@@ -301,12 +320,14 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should use initialMessage when initialMessages is empty", async () => {
+      const { logger } = createTestFileLogger("resume-empty-initial-messages");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
         initialMessage: "Say the word 'banana' and then call task_complete.",
         initialMessages: [],
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       const fullOutput = JSON.stringify(result).toLowerCase();
@@ -319,6 +340,7 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Context Limit and Summarization", () => {
     it("should trigger summarization when approaching token limit", async () => {
+      const { logger } = createTestFileLogger("context-summarization-trigger");
       let summarizeCalled = false;
       const messages: Message[][] = [];
       const largeContent = "X".repeat(20000); // 20k chars per tool response
@@ -326,6 +348,7 @@ describe("Agent Session Integration Tests", () => {
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "Call getLargeData 2 times then complete immediately.",
         initialMessage: "Call getLargeData 2 times then complete immediately.",
+        logger,
         tools: {
           getLargeData: {
             description: "Returns large data",
@@ -353,6 +376,9 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should allow modifying messages before summarization", async () => {
+      const { logger } = createTestFileLogger(
+        "context-modify-before-summarize",
+      );
       let beforeSummarizeMessages: Message[] = [];
       let afterSummarizeMessages: Message[] = [];
       const largeContent = "Y".repeat(20000); // 20k chars per tool response
@@ -360,6 +386,7 @@ describe("Agent Session Integration Tests", () => {
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "Call getLargeData 2 times then complete immediately.",
         initialMessage: "Call getLargeData 2 times then complete immediately.",
+        logger,
         tools: {
           getLargeData: {
             description: "Returns large data",
@@ -395,12 +422,16 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should continue functioning after summarization", async () => {
+      const { logger } = createTestFileLogger(
+        "context-continue-after-summarize",
+      );
       const largeContent = "Z".repeat(20000); // 20k chars per tool response
       let summarized = false;
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "Call getLargeData 2 times then complete immediately.",
         initialMessage: "Call getLargeData 2 times then complete immediately.",
+        logger,
         tools: {
           getLargeData: {
             description: "Returns large data",
@@ -432,6 +463,7 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Error Handling", () => {
     it("should handle tool execution errors gracefully", async () => {
+      const { logger } = createTestFileLogger("error-tool-execution");
       const errors: string[] = [];
       let toolCalled = false;
 
@@ -440,6 +472,7 @@ describe("Agent Session Integration Tests", () => {
           "You are a test assistant. You must call the failingTool before completing.",
         initialMessage:
           "Call the failingTool with input 'test', then call task_complete.",
+        logger,
         tools: {
           failingTool: {
             description: "A tool that always fails when called",
@@ -471,10 +504,12 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should handle invalid tool arguments", async () => {
+      const { logger } = createTestFileLogger("error-invalid-tool-args");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a math assistant.",
         initialMessage:
           "Use calculator with valid arguments: add 2 and 3. Then complete.",
+        logger,
         tools: {
           calculator: {
             description: "Add two numbers",
@@ -495,6 +530,7 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Idle Detection", () => {
     it("should send reminder after idle turns", async () => {
+      const { logger } = createTestFileLogger("idle-detection-reminder");
       const assistantMessages: string[] = [];
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
@@ -504,6 +540,7 @@ describe("Agent Session Integration Tests", () => {
           "Just chat with me casually. Do not call any tools yet.",
         tools: {},
         maxTurns: 10,
+        logger,
         callbacks: {
           onAssistantMessage: async (sessionId, text) => {
             assistantMessages.push(text);
@@ -525,6 +562,7 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Turn Limit Testing", () => {
     it("should respect custom maxTurns limit", async () => {
+      const { logger } = createTestFileLogger("turn-limit-custom");
       const customMaxTurns = 3;
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
@@ -533,6 +571,7 @@ describe("Agent Session Integration Tests", () => {
         initialMessage: "Tell me a never-ending story.",
         tools: {},
         maxTurns: customMaxTurns,
+        logger,
       });
 
       // LLM may still complete despite instructions, so just verify turn limit
@@ -548,11 +587,13 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should complete before maxTurns if task finishes", async () => {
+      const { logger } = createTestFileLogger("turn-limit-early-complete");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
         initialMessage: "Immediately call task_complete with 'done'.",
         tools: {},
         maxTurns: 10,
+        logger,
       });
 
       assert.strictEqual(result.completionReason, "task_complete");
@@ -565,12 +606,14 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Task Completion", () => {
     it("should capture task result from task_complete", async () => {
+      const { logger } = createTestFileLogger("task-complete-result");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a data assistant.",
         initialMessage:
           "Complete the task with result object containing: {answer: 42, status: 'success'}",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.strictEqual(result.completionReason, "task_complete");
@@ -581,11 +624,13 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should include summary in task completion", async () => {
+      const { logger } = createTestFileLogger("task-complete-summary");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
         initialMessage: "Do a simple calculation (2+2) and call task_complete.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.strictEqual(result.completionReason, "task_complete");
@@ -598,11 +643,13 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Message History", () => {
     it("should maintain message history throughout session", async () => {
+      const { logger } = createTestFileLogger("message-history-maintain");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
         initialMessage: "Say hello and then call task_complete.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.ok(result.messages.length > 0, "Should have messages");
@@ -617,6 +664,7 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should update message history via callback", async () => {
+      const { logger } = createTestFileLogger("message-history-callback");
       const messageSnapshots: number[] = [];
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
@@ -624,6 +672,7 @@ describe("Agent Session Integration Tests", () => {
         initialMessage: "Complete this task quickly.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
         callbacks: {
           onMessagesUpdate: async (sessionId, messages) => {
             messageSnapshots.push(messages.length);
@@ -639,6 +688,7 @@ describe("Agent Session Integration Tests", () => {
 
   describe("Session Suspension", () => {
     it("should suspend session when tool returns __suspend__ signal", async () => {
+      const { logger } = createTestFileLogger("suspend-basic");
       let suspendCalled = false;
       let suspendInfo: any = null;
 
@@ -646,6 +696,7 @@ describe("Agent Session Integration Tests", () => {
         systemPrompt: "You are a helpful assistant.",
         initialMessage:
           "Please call the wait_for_approval tool to get approval.",
+        logger,
         tools: {
           wait_for_approval: {
             description: "Wait for external approval before proceeding",
@@ -685,11 +736,13 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should resume suspended session with additional message", async () => {
+      const { logger } = createTestFileLogger("suspend-resume");
       // First session - suspend
       const initialResult = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant that needs approval.",
         initialMessage:
           "Call wait_for_approval to ask for permission to proceed.",
+        logger,
         tools: {
           wait_for_approval: {
             description: "Wait for external approval",
@@ -724,6 +777,7 @@ describe("Agent Session Integration Tests", () => {
         ],
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       // Should complete successfully after resuming
@@ -733,6 +787,7 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should maintain conversation context across suspension and resumption", async () => {
+      const { logger } = createTestFileLogger("suspend-context-maintained");
       let suspendCount = 0;
 
       // First session - introduce context and suspend
@@ -741,6 +796,7 @@ describe("Agent Session Integration Tests", () => {
           "You are a helpful assistant. Remember information you're told.",
         initialMessage:
           "My favorite color is blue. Now call the ask_question tool to ask me something.",
+        logger,
         tools: {
           ask_question: {
             description: "Ask the user a question and wait for their answer",
@@ -779,6 +835,7 @@ describe("Agent Session Integration Tests", () => {
         ],
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.strictEqual(result2.completionReason, "task_complete");
@@ -794,12 +851,14 @@ describe("Agent Session Integration Tests", () => {
     });
 
     it("should handle multiple suspensions in sequence", async () => {
+      const { logger } = createTestFileLogger("suspend-multiple-sequence");
       const suspensions: string[] = [];
 
       // First suspension
       const result1 = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
         initialMessage: "Call the wait tool with reason 'step1'.",
+        logger,
         tools: {
           wait: {
             description: "Wait for external input",
@@ -832,6 +891,7 @@ describe("Agent Session Integration Tests", () => {
             content: "Step 1 complete. Now call wait with reason 'step2'.",
           },
         ],
+        logger,
         tools: {
           wait: {
             description: "Wait for external input",
@@ -867,6 +927,7 @@ describe("Agent Session Integration Tests", () => {
         ],
         tools: {},
         maxTurns: FAST_MAX_TURNS,
+        logger,
       });
 
       assert.strictEqual(result3.completionReason, "task_complete");
