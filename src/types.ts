@@ -239,6 +239,9 @@ export interface AgentSession {
     onfulfilled?: (value: AgentSessionResult) => T | Promise<T>,
     onrejected?: (reason: any) => T | Promise<T>,
   ) => Promise<T>;
+
+  /** Stop the session - returns a promise that resolves when actually stopped */
+  stop: () => Promise<void>;
 }
 
 /**

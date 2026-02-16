@@ -447,6 +447,8 @@ export function runAgentSession(
   const logger = sessionConfig.logger || defaultLogger;
   const maxTurns = sessionConfig.maxTurns || 50;
   const sessionId = sessionConfig.sessionId || randomUUID();
+  let stopRequested = false;
+  let stopResolver: ((value: void | PromiseLike<void>) => void) | undefined;
 
   // Determine initial messages
   const initialMessages = sessionConfig.initialMessages || [];
@@ -503,7 +505,11 @@ export function runAgentSession(
     const maxIdleTurns = 2; // Nudge after 2 turns of idle behavior
 
     try {
-      while (state.shouldContinue && state.turnCount < maxTurns) {
+      while (
+        state.shouldContinue &&
+        state.turnCount < maxTurns &&
+        !stopRequested
+      ) {
         // Check for idle behavior before turn
         if (state.turnCount > 0 && isAgentIdle(state)) {
           idleTurns++;
@@ -537,21 +543,30 @@ export function runAgentSession(
       }
 
       // Notify completion
-      const completeInfo: SessionCompleteInfo = {
-        finalOutput: state.finalOutput,
-        totalTurns: state.turnCount,
-        completionReason: state.completionReason,
-        taskResult: state.taskResult,
-        suspendInfo: state.suspendInfo,
-      };
+      // Check if stopped
+      if (stopRequested) {
+        state.completionReason = "max_turns"; // Use max_turns as the reason for stop
+        logger.info("Session stopped by user request");
+        if (stopResolver) {
+          stopResolver();
+        }
+      }
 
+      // Notify session complete
       if (sessionConfig.callbacks?.onComplete) {
+        const completeInfo: SessionCompleteInfo = {
+          finalOutput: state.finalOutput,
+          totalTurns: state.turnCount,
+          completionReason: state.completionReason,
+          taskResult: state.taskResult,
+          suspendInfo: state.suspendInfo,
+        };
         await sessionConfig.callbacks.onComplete(sessionId, completeInfo);
       }
 
       return {
         sessionId,
-        finalOutput: state.finalOutput || "(no output)",
+        finalOutput: state.finalOutput,
         totalTurns: state.turnCount,
         completionReason: state.completionReason,
         messages: state.messages,
@@ -610,5 +625,12 @@ export function runAgentSession(
       onfulfilled?: (value: AgentSessionResult) => T | Promise<T>,
       onrejected?: (reason: any) => T | Promise<T>,
     ) => promise.then(onfulfilled, onrejected),
+    stop: (): Promise<void> => {
+      logger.info(`Stop requested for session ${sessionId}`);
+      stopRequested = true;
+      return new Promise<void>((resolve) => {
+        stopResolver = resolve;
+      });
+    },
   };
 }
