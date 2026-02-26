@@ -15,6 +15,7 @@ import {
   SessionState,
   Message,
   defaultLogger,
+  DEFAULT_SYSTEM_PROMPT,
   Logger,
   ToolCallInfo,
   ToolResultInfo,
@@ -161,7 +162,7 @@ async function runTurn(
     // Call LLM with timeout if specified
     const generatePromise = generateText({
       model: getModelInstance(modelConfig),
-      system: sessionConfig.systemPrompt,
+      system: sessionConfig.systemPrompt || DEFAULT_SYSTEM_PROMPT,
       messages: state.messages,
       tools: allTools,
     });
@@ -279,6 +280,7 @@ async function runTurn(
           state.shouldContinue = false;
           state.completionReason = "task_complete";
           state.taskResult = resultData.result;
+          state.finalOutput = resultData.summary;
 
           // Add SDK's response messages (includes tool calls and results)
           state.messages.push(...result.response.messages);
@@ -451,7 +453,7 @@ export function runAgentSession(
   let stopResolver: ((value: void | PromiseLike<void>) => void) | undefined;
 
   // Determine initial messages
-  const initialMessages = sessionConfig.initialMessages || [];
+  const initialMessages = sessionConfig.messages || [];
   let derivedInitialMessage: string;
 
   if (initialMessages.length > 0) {

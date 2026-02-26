@@ -24,4 +24,4 @@ export type {
   AgentSession,
 } from "./types.js";
 
-export { defaultLogger } from "./types.js";
+export { defaultLogger, DEFAULT_SYSTEM_PROMPT } from "./types.js";

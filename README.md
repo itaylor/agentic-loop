@@ -18,7 +18,6 @@ import { z } from "zod";
 const result = await runAgentSession(
   { provider: "openai", model: "gpt-4o", apiKey: process.env.OPENAI_API_KEY },
   {
-    systemPrompt: "You are a helpful assistant.",
     tools: {
       search: {
         description: "Search for information",
@@ -71,11 +70,11 @@ The session object is "thenable" - you can await it directly.
 **AgentSessionConfig:**
 ```typescript
 {
-  systemPrompt: string;
+  systemPrompt?: string;        // Optional — defaults to a generic helpful assistant prompt
   tools: Record<string, Tool>;
   sessionId?: string;           // Auto-generated if not provided
-  initialMessages?: Message[];  // Resume from these messages
-  initialMessage?: string;      // Only used if initialMessages empty
+  messages?: Message[];         // Resume from saved messages (ignored if empty)
+  initialMessage?: string;      // Starting message for fresh sessions (ignored if messages provided)
   maxTurns?: number;            // Default: 50
   tokenLimit?: number;          // Trigger summarization
   llmTimeout?: number;          // LLM call timeout (ms)
@@ -168,8 +167,8 @@ When the agent calls tools, the AI SDK automatically creates messages with struc
 const result = await runAgentSession(
   { provider: "ollama", model: "qwen2.5:7b" },
   {
-    systemPrompt: "You are a helpful assistant.",
     tools: { /* your tools */ },
+    initialMessage: "Summarize the three laws of thermodynamics.",
   }
 );
 ```
@@ -179,7 +178,7 @@ const result = await runAgentSession(
 ```typescript
 const session = runAgentSession(modelConfig, {
   sessionId: generateId(),
-  systemPrompt: "...",
+  systemPrompt: "You are a specialized data analyst.",
   tools: myTools,
   callbacks: {
     onMessagesUpdate: async (sessionId, messages) => {
@@ -202,8 +201,8 @@ const result = await session.promise;
 const savedMessages = await db.loadMessages("session-123");
 
 const session = runAgentSession(modelConfig, {
-  sessionId: "session-123",      // Same ID
-  initialMessages: savedMessages, // Continue from here
+  sessionId: "session-123",   // Same ID
+  messages: savedMessages,    // Continue from here
   systemPrompt: "...",
   tools: myTools,
 });
@@ -222,6 +221,28 @@ const mcpTools = await mcpClient.tools();
 const result = await runAgentSession(modelConfig, {
   tools: mcpTools,  // Pass MCP tools directly
   // ...
+});
+
+await mcpClient.close();
+```
+
+If you want to give your agent code editing capabilities (read/write files, search, apply patches, etc.), consider using [agent-mcp](https://github.com/itaylor/agent-mcp) — a fast stdio MCP server providing file system navigation, text search, code analysis, and patch application.
+
+```typescript
+import { Experimental_StdioMCPTransport } from "@ai-sdk/mcp/mcp-stdio";
+import { createMCPClient } from "@ai-sdk/mcp";
+
+const transport = new Experimental_StdioMCPTransport({
+  command: "/path/to/agent-mcp",
+  args: ["/path/to/your/repo"],
+});
+
+const mcpClient = await createMCPClient({ transport });
+const mcpTools = await mcpClient.tools();
+
+const result = await runAgentSession(modelConfig, {
+  tools: mcpTools,
+  initialMessage: "Review the codebase and fix any TypeScript errors you find.",
 });
 
 await mcpClient.close();
@@ -368,10 +389,10 @@ To resume, simply call `runAgentSession` again with the saved messages plus the 
 // Later, when approval arrives...
 const suspendedSession = await db.loadSuspendedSession(sessionId);
 
-const resumedResult = await runAgentSession(modelConfig, {
+const result = await runAgentSession(modelConfig, {
   sessionId: sessionId,  // Same session ID
   systemPrompt: "You are a helpful assistant that needs approval.",
-  initialMessages: [
+  messages: [
     ...suspendedSession.messages,  // All previous messages
     {
       role: "user",
@@ -406,7 +427,7 @@ if (result.completionReason === "suspended") {
 const saved = JSON.parse(await fs.readFile(`sessions/${sessionId}.json`));
 const resumedResult = await runAgentSession(modelConfig, {
   sessionId: saved.sessionId,
-  initialMessages: [
+  messages: [
     ...saved.messages,
     { role: "user", content: "External data has arrived: {...}" },
   ],
@@ -432,14 +453,14 @@ let result = await runAgentSession(modelConfig, config);
 // First suspension
 assert.equal(result.completionReason, "suspended");
 result = await runAgentSession(modelConfig, {
-  initialMessages: [...result.messages, { role: "user", content: "Step 1 done" }],
+  messages: [...result.messages, { role: "user", content: "Step 1 done" }],
   // ...
 });
 
 // Second suspension
 assert.equal(result.completionReason, "suspended");
 result = await runAgentSession(modelConfig, {
-  initialMessages: [...result.messages, { role: "user", content: "Step 2 done" }],
+  messages: [...result.messages, { role: "user", content: "Step 2 done" }],
   // ...
 });
 

@@ -110,7 +110,7 @@ When done, call task_complete with a summary.`,
       sessionId: "resumed-session-003",
       systemPrompt: "You are a helpful assistant that can do math.",
       tools,
-      initialMessages: savedMessages, // Resume from here
+      messages: savedMessages, // Resume from here
       maxTurns: 10,
     },
   );

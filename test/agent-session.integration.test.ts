@@ -33,7 +33,6 @@ describe("Agent Session Integration Tests", () => {
     it("should complete a simple task successfully", async () => {
       const { logger } = createTestFileLogger("basic-simple-task");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "You are a helpful assistant.",
         initialMessage: "What is 2+2? Call task_complete with the answer.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
@@ -54,7 +53,6 @@ describe("Agent Session Integration Tests", () => {
     it("should return sessionId immediately", async () => {
       const { logger } = createTestFileLogger("basic-session-id");
       const session = runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "You are a helpful assistant.",
         initialMessage: "Say hello and complete the task.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
@@ -77,7 +75,6 @@ describe("Agent Session Integration Tests", () => {
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         sessionId: customSessionId,
-        systemPrompt: "You are a helpful assistant.",
         initialMessage: "Complete this task immediately.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
@@ -116,7 +113,6 @@ describe("Agent Session Integration Tests", () => {
       const toolCalls: string[] = [];
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "You are a calculator assistant.",
         initialMessage: "Use the calculator to add 5 and 7, then complete.",
         logger,
         tools: {
@@ -158,7 +154,6 @@ describe("Agent Session Integration Tests", () => {
       const operations: string[] = [];
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "You are a data processor.",
         initialMessage:
           "Store the value 'hello', retrieve it, then store 'world' and complete.",
         logger,
@@ -256,7 +251,6 @@ describe("Agent Session Integration Tests", () => {
 
       await runAgentSession(TEST_MODEL_CONFIG, {
         sessionId: customSessionId,
-        systemPrompt: "You are a test assistant.",
         initialMessage: "Complete immediately.",
         tools: {},
         maxTurns: FAST_MAX_TURNS,
@@ -286,8 +280,8 @@ describe("Agent Session Integration Tests", () => {
   });
 
   describe("Session Resumption", () => {
-    it("should resume from initialMessages", async () => {
-      const { logger } = createTestFileLogger("resume-from-initial-messages");
+    it("should resume from messages", async () => {
+      const { logger } = createTestFileLogger("resume-from-messages");
       const initialMessages: Message[] = [
         { role: "user", content: "Remember the number 42" },
         {
@@ -304,14 +298,14 @@ describe("Agent Session Integration Tests", () => {
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant with good memory.",
-        initialMessages,
+        messages: initialMessages,
         tools: {},
         maxTurns: FAST_MAX_TURNS,
         logger,
       });
 
       assert.strictEqual(result.completionReason, "task_complete");
-      // The agent should have the context from initialMessages
+      // The agent should have the context from messages
       const fullOutput = JSON.stringify(result);
       assert.ok(
         fullOutput.includes("42"),
@@ -319,12 +313,11 @@ describe("Agent Session Integration Tests", () => {
       );
     });
 
-    it("should use initialMessage when initialMessages is empty", async () => {
-      const { logger } = createTestFileLogger("resume-empty-initial-messages");
+    it("should use initialMessage when messages is empty", async () => {
+      const { logger } = createTestFileLogger("resume-empty-messages");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "You are a helpful assistant.",
         initialMessage: "Say the word 'banana' and then call task_complete.",
-        initialMessages: [],
+        messages: [],
         tools: {},
         maxTurns: FAST_MAX_TURNS,
         logger,
@@ -346,7 +339,6 @@ describe("Agent Session Integration Tests", () => {
       const largeContent = "X".repeat(20000); // 20k chars per tool response
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "Call getLargeData 2 times then complete immediately.",
         initialMessage: "Call getLargeData 2 times then complete immediately.",
         logger,
         tools: {
@@ -384,7 +376,6 @@ describe("Agent Session Integration Tests", () => {
       const largeContent = "Y".repeat(20000); // 20k chars per tool response
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "Call getLargeData 2 times then complete immediately.",
         initialMessage: "Call getLargeData 2 times then complete immediately.",
         logger,
         tools: {
@@ -429,7 +420,6 @@ describe("Agent Session Integration Tests", () => {
       let summarized = false;
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "Call getLargeData 2 times then complete immediately.",
         initialMessage: "Call getLargeData 2 times then complete immediately.",
         logger,
         tools: {
@@ -468,8 +458,6 @@ describe("Agent Session Integration Tests", () => {
       let toolCalled = false;
 
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt:
-          "You are a test assistant. You must call the failingTool before completing.",
         initialMessage:
           "Call the failingTool with input 'test', then call task_complete.",
         logger,
@@ -506,7 +494,6 @@ describe("Agent Session Integration Tests", () => {
     it("should handle invalid tool arguments", async () => {
       const { logger } = createTestFileLogger("error-invalid-tool-args");
       const result = await runAgentSession(TEST_MODEL_CONFIG, {
-        systemPrompt: "You are a math assistant.",
         initialMessage:
           "Use calculator with valid arguments: add 2 and 3. Then complete.",
         logger,
@@ -767,7 +754,7 @@ describe("Agent Session Integration Tests", () => {
       // Resume with approval message
       const resumedResult = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant that needs approval.",
-        initialMessages: [
+        messages: [
           ...initialResult.messages,
           {
             role: "user",
@@ -825,7 +812,7 @@ describe("Agent Session Integration Tests", () => {
       const result2 = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt:
           "You are a helpful assistant. Remember information you're told.",
-        initialMessages: [
+        messages: [
           ...result1.messages,
           {
             role: "user",
@@ -884,7 +871,7 @@ describe("Agent Session Integration Tests", () => {
       // Resume and suspend again
       const result2 = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
-        initialMessages: [
+        messages: [
           ...result1.messages,
           {
             role: "user",
@@ -917,7 +904,7 @@ describe("Agent Session Integration Tests", () => {
       // Final resume and complete
       const result3 = await runAgentSession(TEST_MODEL_CONFIG, {
         systemPrompt: "You are a helpful assistant.",
-        initialMessages: [
+        messages: [
           ...result2.messages,
           {
             role: "user",

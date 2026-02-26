@@ -170,7 +170,7 @@ export interface SessionCallbacks {
   /**
    * Called when the session is suspended (agent is blocked waiting for something)
    * The session has stopped and its state is in the result.
-   * To resume, call runAgentSession again with initialMessages from the result,
+   * To resume, call runAgentSession again with messages from the result,
    * optionally adding a message with the information the agent was waiting for.
    */
   onSuspend?: (
@@ -180,11 +180,20 @@ export interface SessionCallbacks {
 }
 
 /**
+ * Default system prompt used when no systemPrompt is provided
+ */
+export const DEFAULT_SYSTEM_PROMPT =
+  "You are a helpful assistant. You complete any tasks given to you and when finished, you call `task_complete` with a summary and any applicable results.";
+
+/**
  * Configuration for an agent session
  */
 export interface AgentSessionConfig {
-  /** System prompt for the agent */
-  systemPrompt: string;
+  /**
+   * System prompt for the agent.
+   * Defaults to a generic helpful assistant prompt if not provided.
+   */
+  systemPrompt?: string;
 
   /** Tools available to the agent (including any MCP tools) */
   tools: Record<string, Tool>;
@@ -192,10 +201,14 @@ export interface AgentSessionConfig {
   /** Session ID for tracking and persistence (passed to all callbacks) */
   sessionId?: string;
 
-  /** Resume from previous messages (for session recovery) */
-  initialMessages?: Message[];
+  /**
+   * Resume from previously saved messages (for crash recovery or resuming after suspension).
+   * When provided, the session continues from this message history.
+   * Mutually exclusive with initialMessage — if messages is provided, initialMessage is ignored.
+   */
+  messages?: Message[];
 
-  /** Initial user message to start the session (ignored if initialMessages provided) */
+  /** Initial user message to start a fresh session (ignored if messages provided) */
   initialMessage?: string;
 
   /** Maximum number of turns before forcing completion (default: 50) */
