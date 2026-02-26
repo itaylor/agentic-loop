@@ -510,7 +510,3 @@ tool with a summary. If you are not done yet, please continue working.
 ## License
 
 MIT
-
-## Changelog
-
-See [CHANGELOG.md](./CHANGELOG.md)

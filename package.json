@@ -27,17 +27,16 @@
     "openai",
     "ollama"
   ],
-  "author": "",
+  "author": "itaylor",
   "license": "MIT",
   "dependencies": {
     "dotenv": "^17.2.3",
-    "zod": "^4.3.5"
-  },
-  "peerDependencies": {
+    "zod": "^4.3.5",
     "@ai-sdk/anthropic": "^3.0.36",
     "@ai-sdk/openai": "^3.0.25",
     "ai": "^6.0.0",
-    "ai-sdk-ollama": "^3.0.0"
+    "ai-sdk-ollama": "^3.0.0",
+    "@ai-sdk/provider-utils": "^4.0.15"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
