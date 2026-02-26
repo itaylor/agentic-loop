@@ -1,4 +1,4 @@
-// Basic example of using @waterfell/agentic-loop
+// Basic example of using @itaylor/agentic-loop
 
 import { runAgentSession, type Message } from "../src/index.js";
 import { z } from "zod";

@@ -1,17 +1,17 @@
-# @waterfell/agentic-loop
+# agentic-loop
 
 A lightweight, functional library for running agentic loops with LLMs, tool calling, and summarization support.
 
 ## Installation
 
 ```bash
-npm install @waterfell/agentic-loop
+npm install @itaylor/agentic-loop
 ```
 
 ## Quick Start
 
 ```typescript
-import { runAgentSession } from "@waterfell/agentic-loop";
+import { runAgentSession } from "@itaylor/agentic-loop";
 import { z } from "zod";
 
 // Simple case - await directly

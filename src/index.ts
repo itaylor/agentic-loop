@@ -1,4 +1,4 @@
-// Public API for @waterfell/agentic-loop
+// Public API for @itaylor/agentic-loop
 
 export { runAgentSession } from "./agent-session.js";
 

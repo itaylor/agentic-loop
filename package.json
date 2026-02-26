@@ -1,5 +1,5 @@
 {
-  "name": "@waterfell/agentic-loop",
+  "name": "@itaylor/agentic-loop",
   "version": "0.2.0",
   "description": "A lightweight library for running agentic loops with LLMs and tool calling",
   "type": "module",
