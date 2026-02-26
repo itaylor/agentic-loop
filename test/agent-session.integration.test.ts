@@ -19,7 +19,11 @@ import { createTestFileLogger } from "./test-helpers.js";
 
 // Test configuration - uses OpenAI in CI (when OPENAI_API_KEY is set), Ollama locally
 const TEST_MODEL_CONFIG: ModelConfig = process.env.OPENAI_API_KEY
-  ? { provider: "openai", model: "gpt-4.1-nano" }
+  ? {
+      provider: "openai",
+      model: "gpt-4.1-nano",
+      apiKey: process.env.OPENAI_API_KEY,
+    }
   : {
       provider: "ollama",
       model: "gpt-oss:20b-128k",
