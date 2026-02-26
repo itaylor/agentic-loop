@@ -2,8 +2,10 @@ name: Release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
+    paths:
+      - package.json
 
 jobs:
   release:
@@ -13,26 +15,56 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
-      - uses: actions/setup-node@v4
+      - name: Check if version changed
+        id: version
+        run: |
+          PREV=$(git show HEAD~1:package.json | jq -r '.version')
+          CURR=$(jq -r '.version' package.json)
+          if [ "$PREV" != "$CURR" ]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "value=$CURR" >> $GITHUB_OUTPUT
+          else
+            echo "changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Node
+        if: steps.version.outputs.changed == 'true'
+        uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      - run: npm install -g npm@latest
+      - name: Install dependencies
+        if: steps.version.outputs.changed == 'true'
+        run: npm ci
 
-      - run: npm ci
+      - name: Build
+        if: steps.version.outputs.changed == 'true'
+        run: npm run build
 
-      - run: npm run build
-
-      - run: npm test
+      - name: Test
+        if: steps.version.outputs.changed == 'true'
+        run: npm test
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
-      - run: npm publish --provenance --access public
+      - name: Tag release
+        if: steps.version.outputs.changed == 'true'
+        run: |
+          git tag "v${{ steps.version.outputs.value }}"
+          git push origin "v${{ steps.version.outputs.value }}"
+
+      - name: Publish to npm
+        if: steps.version.outputs.changed == 'true'
+        run: npm install -g npm@latest && npm publish --provenance --access public
 
       - name: Create GitHub Release
+        if: steps.version.outputs.changed == 'true'
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.version.outputs.value }}
           generate_release_notes: true
