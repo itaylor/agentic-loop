@@ -6,11 +6,13 @@ import assert from "node:assert";
 import { runAgentSession } from "../src/agent-session.js";
 import type { ModelConfig } from "../src/types.js";
 
-const TEST_MODEL_CONFIG: ModelConfig = {
-  provider: "ollama",
-  model: "gpt-oss:20b-128k",
-  baseURL: "http://127.0.0.1:11434",
-};
+const TEST_MODEL_CONFIG: ModelConfig = process.env.OPENAI_API_KEY
+  ? { provider: "openai", model: "gpt-4.1-nano" }
+  : {
+      provider: "ollama",
+      model: "gpt-oss:20b-128k",
+      baseURL: "http://127.0.0.1:11434",
+    };
 
 describe("Sanity Test", () => {
   it("should connect to Ollama and complete a simple task", async () => {

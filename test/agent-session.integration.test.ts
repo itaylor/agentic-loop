@@ -17,12 +17,14 @@ import type {
 import { z } from "zod";
 import { createTestFileLogger } from "./test-helpers.js";
 
-// Test configuration - Ollama instance at localhost
-const TEST_MODEL_CONFIG: ModelConfig = {
-  provider: "ollama",
-  model: "gpt-oss:20b-128k",
-  baseURL: "http://127.0.0.1:11434",
-};
+// Test configuration - uses OpenAI in CI (when OPENAI_API_KEY is set), Ollama locally
+const TEST_MODEL_CONFIG: ModelConfig = process.env.OPENAI_API_KEY
+  ? { provider: "openai", model: "gpt-4.1-nano" }
+  : {
+      provider: "ollama",
+      model: "gpt-oss:20b-128k",
+      baseURL: "http://127.0.0.1:11434",
+    };
 
 // Reduced limits for faster testing
 const FAST_TOKEN_LIMIT = 4000; // ~1000 tokens - triggers summarization quickly
