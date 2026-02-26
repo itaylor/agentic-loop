@@ -1,6 +1,6 @@
 # @waterfell/agentic-loop
 
-A lightweight, functional library for running agentic loops with LLMs and tool calling.
+A lightweight, functional library for running agentic loops with LLMs, tool calling, and summarization support.
 
 ## Installation
 
